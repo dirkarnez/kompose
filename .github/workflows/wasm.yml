@@ -1,0 +1,56 @@
+name: golang-build-actions-workflow
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+      
+permissions:
+    contents: write
+    
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      libraryName: kompose
+      tagName: v1.34.0
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/checkout@v4
+        with:
+          repository: kubernetes/kompose
+          ref: ${{ env.tagName }}
+          path: ${{ env.libraryName }}
+          submodules: true
+      
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.21.0' # The Go version to download (if necessary) and use.
+
+    # copy main_js.go to 
+      - working-directory: ${{ env.libraryName }}
+        run: go get .
+      
+      - working-directory: ${{ env.libraryName }}
+        run: GOOS=js GOARCH=wasm CGO_ENABLED=0 go build -o kompose.wasm main_js.go
+
+# copy "%GOROOT%misc\wasm\wasm_exec.js" build-webassembly\
+      
+      - name: Archive Release
+        uses: thedoctor0/zip-release@master
+        with:
+          type: 'zip'
+          path: '${{ env.libraryName }}/${{ github.event.repository.name }}*'
+          filename: "${{ github.event.repository.name }}-${{ github.ref_name }}.zip"
+          
+      - name: Release prebuilt
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "${{ env.libraryName }}/${{ github.event.repository.name }}-${{ github.ref_name }}.zip"
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
